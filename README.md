@@ -2,7 +2,7 @@
 
 Run your own CryptoBattle frontend and earn a share of battle fees. Players back the cryptocurrency they expect to outperform another over a chosen period. Smart contracts on **Base Mainnet (chain ID 8453)** match stakes and settle results. USDC and native ETH have separate pools.
 
-![CryptoBattle frontend on Base](assets/cryptobattle.png)
+![CryptoBattle frontend on Base](assets/cryptobattle.png?v=2)
 
 The total battle fee is **5% of matched stakes**. The operator's base share is 2.5%, reduced by its share of the fixed settlement reserve; platform fees receive the remainder. Operator earnings can be claimed with the configured wallet in the frontend.
 
