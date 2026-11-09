@@ -1,0 +1,15 @@
+{
+  "name": "cryptobattle-market-data",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test:api": "node enduser-api.test.mjs",
+    "start": "node server.mjs",
+    "check": "node --check server.mjs && node customer-api.test.mjs"
+  },
+  "dependencies": {
+    "redis": "5.12.1",
+    "viem": "^2.55.18"
+  }
+}

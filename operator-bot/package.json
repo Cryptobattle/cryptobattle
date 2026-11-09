@@ -1,0 +1,13 @@
+{
+  "name": "cryptobattle-operator-bot",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "node bot.mjs",
+    "check": "node --check bot.mjs && node --check customer.mjs && node customer-core.test.mjs"
+  },
+  "dependencies": {
+    "viem": "2.55.19"
+  }
+}

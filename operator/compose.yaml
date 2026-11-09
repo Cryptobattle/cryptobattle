@@ -1,0 +1,152 @@
+name: cryptobattle-operator
+
+services:
+  frontend:
+    image: ${OPERATOR_IMAGE:-cryptobattle-operator:local}
+    build:
+      context: ../frontend
+      target: operator
+    environment:
+      ENDUSER_BET_API_ENABLED: ${ENDUSER_BET_API_ENABLED:-false}
+      ENDUSER_SWAP_API_ENABLED: "false"
+      OPERATOR_TRUSTED_PROXY_CIDRS: ${OPERATOR_TRUSTED_PROXY_CIDRS:-}
+      VITE_NETWORK: ${VITE_NETWORK:-baseSepolia}
+      VITE_ENABLED_SETTLEMENT_ASSETS: ${VITE_ENABLED_SETTLEMENT_ASSETS:-USDC,ETH}
+      VITE_USDC_FACTORY_ADDRESS: ${VITE_USDC_FACTORY_ADDRESS:-}
+      VITE_EURC_FACTORY_ADDRESS: ${VITE_EURC_FACTORY_ADDRESS:-}
+      VITE_WETH_FACTORY_ADDRESS: ${VITE_WETH_FACTORY_ADDRESS:-}
+      VITE_ETH_FACTORY_ADDRESS: ${VITE_ETH_FACTORY_ADDRESS:-}
+      VITE_ETH_ADDRESS_MODE: ${VITE_ETH_ADDRESS_MODE:-personal}
+      VITE_OPERATOR_ADDRESS: ${VITE_OPERATOR_ADDRESS:-}
+      VITE_OPERATOR_TELEGRAM_BOT: ${VITE_OPERATOR_TELEGRAM_BOT:-}
+      VITE_CUSTOMER_TELEGRAM_BOT: ${VITE_CUSTOMER_TELEGRAM_BOT:-}
+      VITE_RPC_URLS: ${VITE_RPC_URLS:-}
+      VITE_MARKET_API_URL: ""
+      VITE_SWAPPER_ENABLED: "false"
+    ports:
+      - "${FRONTEND_BIND_ADDRESS:-127.0.0.1}:${FRONTEND_PORT:-8080}:80"
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      operator-api:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  operator-api:
+    image: ${OPERATOR_API_IMAGE:-cryptobattle-operator-api:local}
+    build: ../market-data
+    environment:
+      REDIS_URL: redis://redis:6379
+      REDIS_REQUIRED: "true"
+      RPC_URLS: ${OPERATOR_API_RPC_URLS:-${VITE_RPC_URLS:-}}
+      DISCOVER_FACTORY_CONFIG: "true"
+      EXPECTED_NETWORK: ${VITE_NETWORK:-baseSepolia}
+      ENABLED_SETTLEMENT_ASSETS: ${VITE_ENABLED_SETTLEMENT_ASSETS:-USDC,ETH}
+      OPERATOR_ADDRESS: ${VITE_OPERATOR_ADDRESS:-}
+      USDC_FACTORY_ADDRESS: ${VITE_USDC_FACTORY_ADDRESS:-}
+      EURC_FACTORY_ADDRESS: ${VITE_EURC_FACTORY_ADDRESS:-}
+      WETH_FACTORY_ADDRESS: ${VITE_WETH_FACTORY_ADDRESS:-}
+      ETH_FACTORY_ADDRESS: ${VITE_ETH_FACTORY_ADDRESS:-}
+      ETH_ADDRESS_MODE: ${VITE_ETH_ADDRESS_MODE:-personal}
+      ENDUSER_BET_API_ENABLED: ${ENDUSER_BET_API_ENABLED:-false}
+      ENDUSER_SWAP_API_ENABLED: "false"
+      MARKET_DATA_BASE_URL: ${MARKET_DATA_BASE_URL:-https://data-api.binance.vision}
+      CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-300}
+      ALLOWED_ORIGINS: ${OPERATOR_API_ALLOWED_ORIGINS:-}
+      POOL_CACHE_TTL_SECONDS: ${POOL_CACHE_TTL_SECONDS:-30}
+      POOL_CACHE_CLEANUP_INTERVAL_SECONDS: ${POOL_CACHE_CLEANUP_INTERVAL_SECONDS:-600}
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  redis:
+    image: redis:7.4-alpine
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    volumes:
+      - operator-api-cache:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  operator-bot:
+    profiles: ["telegram"]
+    image: ${OPERATOR_BOT_IMAGE:-cryptobattle-operator-bot:local}
+    build: ../operator-bot
+    environment:
+      RPC_URLS: ${OPERATOR_BOT_RPC_URLS:-${VITE_RPC_URLS:-}}
+      OPERATOR_ADDRESS: ${VITE_OPERATOR_ADDRESS:-}
+      TELEGRAM_BOT_TOKEN: ${OPERATOR_TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_ALLOWED_CHAT_IDS: ${OPERATOR_TELEGRAM_ALLOWED_CHAT_IDS:-}
+      TELEGRAM_POLLING_ENABLED: ${OPERATOR_TELEGRAM_POLLING_ENABLED:-true}
+      OPERATOR_TELEGRAM_REPORT_MODE: ${OPERATOR_TELEGRAM_REPORT_MODE:-each}
+      POLL_INTERVAL_MS: ${OPERATOR_BOT_POLL_INTERVAL_MS:-300000}
+      MARKET_API_URL: http://operator-api:3001
+      BOT_STATE_FILE: /data/operator-bot-state.json
+    volumes:
+      - operator-bot-state:/data
+    depends_on:
+      operator-api:
+        condition: service_healthy
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+  customer-bot:
+    profiles: [customer]
+    image: ${CUSTOMER_BOT_IMAGE:-cryptobattle-customer-bot:local}
+    build: ../operator-bot
+    command: [node, customer.mjs]
+    environment:
+      TELEGRAM_BOT_TOKEN: ${CUSTOMER_TELEGRAM_BOT_TOKEN:-}
+      EXPECTED_BOT_USERNAME: ${VITE_CUSTOMER_TELEGRAM_BOT:-}
+      GROUP_BOT_USERNAME: ${VITE_OPERATOR_TELEGRAM_BOT:-}
+      OPERATOR_ADDRESS: ${VITE_OPERATOR_ADDRESS:-}
+      EXPECTED_NETWORK: ${VITE_NETWORK:-baseSepolia}
+      MARKET_API_URL: http://operator-api:3001
+      CUSTOMER_FRONTEND_URL: ${CUSTOMER_FRONTEND_URL:-}
+      BOT_STATE_FILE: /data/customer-bot-state.json
+      POLL_INTERVAL_MS: ${CUSTOMER_BOT_POLL_INTERVAL_MS:-60000}
+      CUSTOMER_MAX_USERS: ${CUSTOMER_BOT_MAX_USERS:-1000}
+      CUSTOMER_MAX_CHECKS_PER_POLL: ${CUSTOMER_BOT_MAX_CHECKS_PER_POLL:-20}
+    volumes: [customer-bot-state:/data]
+    depends_on:
+      operator-api:
+        condition: service_healthy
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 90s
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+
+volumes:
+  operator-api-cache:
+  operator-bot-state:
+  customer-bot-state:
