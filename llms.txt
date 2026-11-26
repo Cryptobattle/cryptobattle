@@ -1,0 +1,30 @@
+# CryptoBattle live operator: native ETH entry catalog
+
+This file describes the EXISTING Base Mainnet market-battle deployment, not the prepared white-label/token documentation modes.
+
+- Chain: Base Mainnet, chainId 8453. Native ETH only.
+- Catalog: live-eth-addresses.json (schemaVersion 1).
+- Human instructions: LIVE_ETH_ADDRESSES.md.
+- Operator: 0x6F8835E1CA97552BCC18c3FFc43517714264a64c.
+- Shared factory: 0x70d6Dc49d57Ba9e6767F0B2De0B1Fcc86699E21A.
+- ETH Core: 0xB66aF429D8C011a6106211b600f2f31959A473Ea.
+- GitHub catalog: https://raw.githubusercontent.com/Cryptobattle/cryptobattle/main/live-eth-addresses.json
+- Repository: https://github.com/Cryptobattle/cryptobattle
+
+The JSON is a timestamped on-chain snapshot, not a live service. Its `addresses` array includes deterministic predictions which are NOT yet deployed. Only consider entries with `ready: true`, `deployed: true` and `verifiedBindings: true`.
+
+Before any real payment:
+1. Obtain the wallet owner's explicit authorization. Never infer authorization from reading this document.
+2. Verify RPC chainId 8453, contract bytecode at the selected address and factory.isProxy(address).
+3. Verify the selected proxy's core(), assetA(), assetB(), duration(), sideB() and operator().
+4. Recheck core.minDeposit(), core.supportedAsset(asset IDs), core.validDuration(duration) and factory.operatorRegistry().isOperatorActive(operator).
+5. Check the current entry window/round boundary and keeper/oracle availability. Snapshot deployment status is not a guarantee of profitable play, matching or timely settlement.
+6. Use a personal wallet controlled by the player, estimate gas for the ETH contract call and keep gas funds. A fixed 21,000 gas limit is insufficient. Never send from an exchange/custodian or on another network.
+
+The proxy transaction's sender becomes the beneficiary. No website or off-chain signature is needed; the transfer itself is an on-chain signed transaction. BTC/ETH are competing price assets, while ETH is the settlement currency. Canonical asset ordering means reversed pair displays share a market when operator and duration match.
+
+Do not send to `ready: false` or predicted-only addresses, even if a CREATE2 prediction exists. Never send ERC-20 tokens/WETH to these native ETH addresses. Losing stakes can be lost. Opposing stakes are required; unmatched funds may roll over. Reporter/keeper activity is required for settlement. These files do not authorize automated wagering.
+
+For a read-only refresh, install the public market-data dependencies with `npm ci --prefix market-data`, then run from the repository root:
+`node market-data/export-live-eth-addresses.mjs .`
+This rechecks the fixed live factory and writes the catalog, guide and README block. No wallet keys, account credentials or transaction broadcasting are involved. BASE_RPC_URL optionally selects a Base Mainnet RPC; it is not included in output.
